@@ -10,3 +10,7 @@ lib/
 .project
 *.jar
 deploy.sh
+
+config.properties
+.DS_Store
+.idea

@@ -195,9 +195,10 @@ public final class Mod {
 		try (JarFile jar = new JarFile(file.toFile())) {
 			Manifest manifest = jar.getManifest();
 			ZipEntry entry = jar.getEntry("META-INF/mods.toml");
+			ZipEntry entryAlt = jar.getEntry("META-INF/neoforge.mods.toml");
 
-			if (entry != null) {
-				mods = parse(jar.getInputStream(entry), manifest, file);
+			if (entry != null || entryAlt != null) {
+				mods = parse(jar.getInputStream(entry != null ? entry : entryAlt), manifest, file);
 			} else if (jar.getEntry("fabric.mod.json") != null) {
 				throw new IOException(file+" is a fabric-only mod");
 			} else {

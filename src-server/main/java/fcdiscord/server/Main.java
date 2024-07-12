@@ -3,13 +3,8 @@ package fcdiscord.server;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 import fcdiscord.Config;
 import fcdiscord.server.update.ModUpdateHandler;
@@ -18,26 +13,24 @@ import org.javacord.api.DiscordApiBuilder;
 import org.javacord.api.entity.channel.ServerChannel;
 import org.javacord.api.entity.channel.TextChannel;
 import org.javacord.api.entity.intent.Intent;
+import org.javacord.api.entity.message.MessageFlag;
 import org.javacord.api.entity.permission.PermissionType;
-import org.javacord.api.entity.permission.Role;
 import org.javacord.api.entity.server.Server;
 import org.javacord.api.event.message.MessageCreateEvent;
 import org.javacord.api.event.message.reaction.ReactionAddEvent;
 import org.javacord.api.event.server.ServerBecomesAvailableEvent;
-import org.javacord.api.interaction.ApplicationCommandPermissionType;
-import org.javacord.api.interaction.ApplicationCommandPermissions;
-import org.javacord.api.interaction.ApplicationCommandPermissionsUpdater;
 import org.javacord.api.interaction.SlashCommand;
 import org.javacord.api.interaction.SlashCommandInteraction;
-import org.javacord.api.interaction.callback.InteractionCallbackDataFlag;
 import org.javacord.api.listener.message.MessageCreateListener;
 import org.javacord.api.listener.message.reaction.ReactionAddListener;
 import org.javacord.api.listener.server.ServerBecomesAvailableListener;
 
 public final class Main {
+	public static Config config;
+
 	public static void main(String[] args) throws IOException {
 		Path configFile = Paths.get(args.length == 0 ? "config.properties" : args[0]);
-		Config config = Config.createForFile(configFile, false, false);
+		config = Config.createForFile(configFile, false, false);
 
 		if (!config.isValidForApiServer() && !config.isValidForUpdateHandler()) {
 			System.err.println("Missing config entries");
@@ -62,7 +55,7 @@ public final class Main {
 
 		DiscordApi api = new DiscordApiBuilder()
 				.setWaitForUsersOnStartup(true)
-				.setIntents(Intent.GUILDS, Intent.GUILD_MEMBERS, Intent.GUILD_MESSAGES, Intent.GUILD_MESSAGE_REACTIONS, Intent.DIRECT_MESSAGES, Intent.DIRECT_MESSAGE_REACTIONS)
+				.setIntents(Intent.GUILDS, Intent.GUILD_MEMBERS, Intent.GUILD_MESSAGES, Intent.GUILD_MESSAGE_REACTIONS, Intent.DIRECT_MESSAGES, Intent.DIRECT_MESSAGE_REACTIONS, Intent.MESSAGE_CONTENT)
 				.setToken(config.getToken())
 				.addServerBecomesAvailableListener(handler)
 				.addMessageCreateListener(handler)
@@ -93,7 +86,7 @@ public final class Main {
 			initialized = true;
 
 			SlashCommand.with("approveall", "approve all mods")
-			.setDefaultPermission(false)
+			.setDefaultEnabledForPermissions(EnumSet.of(PermissionType.ADMINISTRATOR))
 			.createForServer(server)
 			.thenCompose(cmd -> {
 				System.out.println("approveAll command created");
@@ -106,36 +99,26 @@ public final class Main {
 					Config.Instance instance = instanceMap.get(channel.getId());
 
 					if (instance == null) {
-						interaction.createImmediateResponder().setContent("invalid channel").setFlags(InteractionCallbackDataFlag.EPHEMERAL).respond();
+						interaction.createImmediateResponder().setContent("invalid channel").setFlags(MessageFlag.EPHEMERAL).respond();
 						return;
 					}
 
 					interaction.respondLater()
 					.thenCompose(resp -> {
-						resp.setContent("fetching messages...").setFlags(InteractionCallbackDataFlag.EPHEMERAL).update();
+						resp.setContent("fetching messages...").setFlags(MessageFlag.EPHEMERAL).update();
 
 						return channel.getMessagesWhile(ModUpdateHandler::triggerMessage)
-								.thenCompose(msgs -> interaction.createFollowupMessageBuilder().setContent("processing %d messages".formatted(msgs.size())).setFlags(InteractionCallbackDataFlag.EPHEMERAL).send()
+								.thenCompose(msgs -> interaction.createFollowupMessageBuilder().setContent("processing %d messages".formatted(msgs.size())).setFlags(MessageFlag.EPHEMERAL).send()
 										.thenApply(ignore -> msgs))
 								.thenCompose(messages -> ModUpdateHandler.processMessages(messages, instance.getBaseDir()));
 					})
 					.whenComplete((res, exc) -> {
 						if (exc != null) System.out.printf("error creating approveAll command: %s%n", exc);
-						interaction.createFollowupMessageBuilder().setContent(exc == null ? "done" : "error: ".concat(exc.toString())).setFlags(InteractionCallbackDataFlag.EPHEMERAL).send();
+						interaction.createFollowupMessageBuilder().setContent(exc == null ? "done" : "error: ".concat(exc.toString())).setFlags(MessageFlag.EPHEMERAL).send();
 					});
 				});
 
-				List<ApplicationCommandPermissions> perms = new ArrayList<>();
-
-				for (Role role : server.getRoles()) {
-					if (role.getAllowedPermissions().contains(PermissionType.ADMINISTRATOR)) {
-						perms.add(ApplicationCommandPermissions.create(role.getId(), ApplicationCommandPermissionType.ROLE, true));
-					}
-				}
-
-				System.out.printf("giving approveAll perms to %s%n", perms.stream().map(ApplicationCommandPermissions::getId).map(Object::toString).collect(Collectors.joining(", ")));
-
-				return new ApplicationCommandPermissionsUpdater(server).setPermissions(perms).update(cmd.getId());
+				return CompletableFuture.completedFuture(null);
 			})
 			.exceptionally(exc -> {
 				System.out.printf("error creating approveAll command: %s%n", exc);
