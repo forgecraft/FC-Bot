@@ -73,7 +73,7 @@ publishing {
         val sapsToken = providers.environmentVariable("SAPS_TOKEN")
         if (sapsToken.isPresent) {
             maven {
-                name = "Mikey's Saps Maven Repository"
+                name = "MikeysSapsMavenRepository"
                 url = URI("https://maven.saps.dev/releases")
                 credentials {
                     username = "forgecraft"
