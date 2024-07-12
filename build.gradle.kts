@@ -42,6 +42,10 @@ tasks {
             )
         }
     }
+
+    build {
+        dependsOn(shadowJar)
+    }
 }
 
 publishing {
@@ -62,6 +66,8 @@ publishing {
                     password = token.get()
                 }
             }
+        } else {
+            println("GitHub token not found, skipping GitHub Packages repository")
         }
 
         val sapsToken = providers.environmentVariable("SAPS_TOKEN")
@@ -74,14 +80,16 @@ publishing {
                     password = sapsToken.get()
                 }
             }
+        } else {
+            println("SAPS token not found, skipping SAPS repository")
         }
     }
 }
 
 publishMods {
     dryRun = providers.environmentVariable("GITHUB_TOKEN").getOrNull() == null
-    file = tasks.shadowJar.get().archiveFile.get().asFile
-    additionalFiles.from(tasks.jar.get().archiveFile.get().asFile)
+    file = project.provider { project.tasks.shadowJar }.flatMap { it.get().archiveFile }
+    additionalFiles.from( project.provider { project.tasks.jar }.flatMap { it.get().archiveFile }  )
     changelog = ""
     type = STABLE
 

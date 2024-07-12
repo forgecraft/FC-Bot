@@ -17,4 +17,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
       - name: Build with Gradle
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SAPS_TOKEN: ${{ secrets.SAPS_TOKEN }}
         run: ./gradlew --no-daemon build publish publishMods
