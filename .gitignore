@@ -9,6 +9,7 @@ lib/
 .classpath
 .project
 *.jar
+!/gradle/wrapper/gradle-wrapper.jar
 deploy.sh
 
 config.properties
