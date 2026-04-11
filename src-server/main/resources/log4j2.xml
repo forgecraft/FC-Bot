@@ -9,7 +9,7 @@
     </Appenders>
     <Loggers>
         <Logger name="org.javacord" level="info"/>
-        <Root level="info">
+        <Root level="debug">
             <AppenderRef ref="Console"/>
         </Root>
     </Loggers>

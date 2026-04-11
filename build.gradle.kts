@@ -1,9 +1,13 @@
 import java.net.URI
+import org.jetbrains.gradle.ext.Application
+import org.jetbrains.gradle.ext.runConfigurations
+import org.jetbrains.gradle.ext.settings
 
 plugins {
     java
     id("com.gradleup.shadow") version "9.4.1"
     idea
+    id("org.jetbrains.gradle.plugin.idea-ext") version "1.4.1"
     `maven-publish`
     id("me.modmuss50.mod-publish-plugin") version "1.1.0"
 }
@@ -89,5 +93,20 @@ publishMods {
         accessToken = providers.environmentVariable("GITHUB_TOKEN")
         commitish = providers.environmentVariable("GITHUB_SHA").orElse("dryRun")
         tagName = providers.environmentVariable("GITHUB_REF_NAME").orElse("dryRun")
+    }
+}
+
+idea {
+    project {
+        settings {
+            runConfigurations {
+                create<Application>("Debug App") {
+                    mainClass = "fcdiscord.server.Main"
+                    moduleName = idea.module.name + ".main"
+                    jvmArgs = "-Dlog4j.configurationFile=log4j2.xml -Dorg.apache.logging.log4j.simplelog.StatusLogger.level=DEBUG"
+                    workingDirectory = projectDir.absolutePath
+                }
+            }
+        }
     }
 }
