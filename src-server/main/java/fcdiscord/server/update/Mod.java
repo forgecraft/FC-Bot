@@ -154,6 +154,13 @@ public final class Mod {
 			if (cmp != 0) return cmp;
 		}
 
+		// Special handling for SNAPSHOT versions, let's just always treat them as replaceable
+		// This allows newer SNAPSHOT builds to replace older ones even when version strings are identical
+		if (versionA.toUpperCase().contains("SNAPSHOT") && versionB.toUpperCase().contains("SNAPSHOT")) {
+			LOGGER.debug("Both versions are SNAPSHOTs ({} vs {}), allowing replacement", versionA, versionB);
+			return 1;
+		}
+
 		return 0;
 	}
 
