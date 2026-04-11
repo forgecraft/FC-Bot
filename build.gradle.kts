@@ -38,7 +38,7 @@ repositories {
 dependencies {
     implementation("org.javacord:javacord:3.8.0")
     implementation("org.tomlj:tomlj:1.1.1")
-    implementation("com.grack:nanojson:1.9")
+    implementation("com.google.code.gson:gson:2.13.2")
     implementation("org.slf4j:slf4j-api:2.0.9")
     implementation("org.apache.logging.log4j:log4j-api:2.25.4")
     implementation("org.apache.logging.log4j:log4j-core:2.25.4")

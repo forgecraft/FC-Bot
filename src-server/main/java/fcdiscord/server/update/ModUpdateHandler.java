@@ -23,9 +23,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.grack.nanojson.JsonObject;
-import com.grack.nanojson.JsonParser;
-import com.grack.nanojson.JsonParserException;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import fcdiscord.server.Main;
 import fcdiscord.server.update.Mod.ModEntry;
 import fcdiscord.server.update.Mod.ModList;
@@ -249,19 +249,19 @@ public final class ModUpdateHandler {
 		return handleDownload(uri, instancePath, simulate);
 	}
 
-	private static URI fetchFileUriFromCurse(Matcher matcher) throws URISyntaxException, JsonParserException, IOException, InterruptedException {
+	private static URI fetchFileUriFromCurse(Matcher matcher) throws URISyntaxException, JsonParseException, IOException, InterruptedException {
 		// It's mad how much you have to do to simply get the file from cf these days
 		URI modSearchUrl = new URI("https", null, "api.curseforge.com", -1, "/v1/mods/search", "slug=%s&gameId=432&classId=6".formatted(matcher.group(1)), null);
 		HttpResponse<String> response = httpClient.send(HttpRequest.newBuilder(modSearchUrl).headers("x-api-key", Main.config.getCfApiToken()).timeout(TIMEOUT).build(), BodyHandlers.ofString());
 
 		// Fetch the id from the first data object
 		String body = response.body();
-		JsonObject responseBody = JsonParser.object().from(body);
-		if (responseBody.getArray("data").size() == 0 || !responseBody.getArray("data").getObject(0).has("id")) {
+		JsonObject responseBody = JsonParser.parseString(body).getAsJsonObject();
+		if (responseBody.get("data").getAsJsonArray().isEmpty() || !responseBody.get("data").getAsJsonArray().get(0).getAsJsonObject().has("id")) {
 			throw new RuntimeException("Unable to find project on the curseforge api. Slug is possibly wrong?");
 		}
 
-		int projectId = responseBody.getArray("data").getObject(0).getInt("id");
+		int projectId = responseBody.get("data").getAsJsonArray().get(0).getAsJsonObject().get("id").getAsInt();
 
 		String fileId = matcher.group(2);
 		// Get the file name by looking up the file id using the projectId from above
@@ -269,12 +269,12 @@ public final class ModUpdateHandler {
 		HttpResponse<String> filesResponse = httpClient.send(HttpRequest.newBuilder(filesUrl).headers("x-api-key", Main.config.getCfApiToken()).timeout(TIMEOUT).build(), BodyHandlers.ofString());
 
 		// Pull the actual name from data
-		JsonObject filesResponseBody = JsonParser.object().from(filesResponse.body());
-		if (!filesResponseBody.has("data") || !filesResponseBody.getObject("data").has("id")) {
+		JsonObject filesResponseBody = JsonParser.parseString(filesResponse.body()).getAsJsonObject();
+		if (!filesResponseBody.has("data") || !filesResponseBody.get("data").getAsJsonObject().has("id")) {
 			throw new RuntimeException("Unable to retrieve project id from the project slug, possible curse is broken?");
 		}
 
-		String fileName = filesResponseBody.getObject("data").getString("fileName");
+		String fileName = filesResponseBody.get("data").getAsJsonObject().get("fileName").getAsString();
 
 		// This sometimes won't work but looks like it's only effected on ancient version of the game
 		// Example: https://mediafiles.forgecdn.net/files/538/70/gi.class with the file id of 538070... why does it miss
