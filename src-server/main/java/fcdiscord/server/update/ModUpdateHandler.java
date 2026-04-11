@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 
 public final class ModUpdateHandler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ModUpdateHandler.class);
-	
+
 	public static void handleMessage(Message message, Path instancePath) {
 		if (message.getAuthor().isBotUser()) return;
 
@@ -180,21 +180,24 @@ public final class ModUpdateHandler {
 					}
 				}
 
-				if (!urls.isEmpty()) {
-					LOGGER.warn("failed: {}", String.join(", ", urls));
-					msg.getChannel().sendMessage("Invalid URLs: "+urls.stream().map(u -> "`%s`".formatted(u)).collect(Collectors.joining(", ")));
-				}
-			}
+                if (!urls.isEmpty()) {
+                    LOGGER.warn("failed: {}", String.join(", ", urls));
+                    msg.getChannel().sendMessage("Invalid URLs: "+urls.stream().map(u -> "`%s`".formatted(u)).collect(Collectors.joining(", ")));
+                }
+            }
 
-			for (MessageAttachment attachment : msg.getAttachments()) {
-				String filename = attachment.getFileName();
-				if (!isJar(filename)) continue;
+            // Create a copy to avoid ConcurrentModificationException
+            List<MessageAttachment> attachments = new ArrayList<>(msg.getAttachments());
 
-				LOGGER.debug("processing attachment {}", attachment.getUrl());
-				outputs.add(installFile(filename, attachment::asInputStream, instancePath, simulate));
-			}
+            for (MessageAttachment attachment : attachments) {
+                String filename = attachment.getFileName();
+                if (!isJar(filename)) continue;
 
-			LOGGER.info("installed {} mods", outputs.size());
+                LOGGER.debug("processing attachment {}", attachment.getUrl());
+                outputs.add(installFile(filename, attachment::asInputStream, instancePath, simulate));
+            }
+
+            LOGGER.info("installed {} mods", outputs.size());
 
 			if (outputs.isEmpty()) {
 				msg.addReaction(simulate ? SIM_FAIL : EMPTY_EMOJI);
