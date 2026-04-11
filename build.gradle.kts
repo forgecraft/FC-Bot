@@ -2,15 +2,15 @@ import java.net.URI
 
 plugins {
     java
-    id("com.github.johnrengelman.shadow") version "7.1.0"
+    id("com.gradleup.shadow") version "9.4.1"
     idea
     `maven-publish`
-    id("me.modmuss50.mod-publish-plugin") version "0.5.2"
+    id("me.modmuss50.mod-publish-plugin") version "1.1.0"
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 version = project.properties["version"] as String
@@ -20,6 +20,9 @@ sourceSets {
         java {
             srcDir("src-server/main/java")
             srcDir("src/main/java")
+        }
+        resources {
+            srcDir("src-server/main/resources")
         }
     }
 }
@@ -32,6 +35,10 @@ dependencies {
     implementation("org.javacord:javacord:3.8.0")
     implementation("org.tomlj:tomlj:1.1.1")
     implementation("com.grack:nanojson:1.9")
+    implementation("org.slf4j:slf4j-api:2.0.9")
+    implementation("org.apache.logging.log4j:log4j-api:2.25.4")
+    implementation("org.apache.logging.log4j:log4j-core:2.25.4")
+    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.4")
 }
 
 tasks {
@@ -66,22 +73,6 @@ publishing {
                     password = token.get()
                 }
             }
-        } else {
-            println("GitHub token not found, skipping GitHub Packages repository")
-        }
-
-        val sapsToken = providers.environmentVariable("SAPS_TOKEN")
-        if (sapsToken.isPresent) {
-            maven {
-                name = "MikeysSapsMavenRepository"
-                url = URI("https://maven.saps.dev/releases")
-                credentials {
-                    username = "forgecraft"
-                    password = sapsToken.get()
-                }
-            }
-        } else {
-            println("SAPS token not found, skipping SAPS repository")
         }
     }
 }

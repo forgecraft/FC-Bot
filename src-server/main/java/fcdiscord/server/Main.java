@@ -24,8 +24,11 @@ import org.javacord.api.interaction.SlashCommandInteraction;
 import org.javacord.api.listener.message.MessageCreateListener;
 import org.javacord.api.listener.message.reaction.ReactionAddListener;
 import org.javacord.api.listener.server.ServerBecomesAvailableListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Main {
+	private static final Logger logger = LoggerFactory.getLogger(Main.class);
 	public static Config config;
 
 	public static void main(String[] args) throws IOException {
@@ -33,7 +36,7 @@ public final class Main {
 		config = Config.createForFile(configFile, false, false);
 
 		if (!config.isValidForApiServer() && !config.isValidForUpdateHandler()) {
-			System.err.println("Missing config entries");
+			logger.error("Missing config entries");
 			System.exit(1);
 		}
 
@@ -89,7 +92,7 @@ public final class Main {
 			.setDefaultEnabledForPermissions(EnumSet.of(PermissionType.ADMINISTRATOR))
 			.createForServer(server)
 			.thenCompose(cmd -> {
-				System.out.println("approveAll command created");
+				logger.info("approveAll command created");
 
 				cmd.getApi().addSlashCommandCreateListener(event -> {
 					SlashCommandInteraction interaction = event.getSlashCommandInteractionWithCommandId(cmd.getId()).orElse(null);
@@ -113,7 +116,7 @@ public final class Main {
 								.thenCompose(messages -> ModUpdateHandler.processMessages(messages, instance.getBaseDir()));
 					})
 					.whenComplete((res, exc) -> {
-						if (exc != null) System.out.printf("error creating approveAll command: %s%n", exc);
+						if (exc != null) logger.error("error creating approveAll command: {}", exc.toString());
 						interaction.createFollowupMessageBuilder().setContent(exc == null ? "done" : "error: ".concat(exc.toString())).setFlags(MessageFlag.EPHEMERAL).send();
 					});
 				});
@@ -121,19 +124,19 @@ public final class Main {
 				return CompletableFuture.completedFuture(null);
 			})
 			.exceptionally(exc -> {
-				System.out.printf("error creating approveAll command: %s%n", exc);
+				logger.error("error creating approveAll command: {}", exc.toString());
 				return null;
 			});
 
-			System.out.println("Instances:");
+			logger.info("Instances:");
 
 			for (Config.Instance instance : instanceMap.values()) {
 				ServerChannel channel = server.getChannelById(instance.getChannelId()).orElse(null);
 
-				System.out.printf("  %s: %s%n", channel != null ? "#"+channel.getName() : "missing:"+instance.getChannelId(), instance.getBaseDir());
+				logger.info("  {}: {}", channel != null ? "#"+channel.getName() : "missing:"+instance.getChannelId(), instance.getBaseDir());
 			}
 
-			System.out.println("Ready");
+			logger.info("Ready");
 		}
 
 		@Override
@@ -172,7 +175,7 @@ public final class Main {
 					}
 				})
 				.exceptionally(exc -> {
-					System.out.printf("error handling reaction addition: %s%n", exc);
+					logger.error("error handling reaction addition: {}", exc.toString());
 					return null;
 				});
 			}

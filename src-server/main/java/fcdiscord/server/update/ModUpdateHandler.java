@@ -37,8 +37,12 @@ import org.javacord.api.entity.message.Reaction;
 import org.javacord.api.entity.message.mention.AllowedMentionsBuilder;
 import org.javacord.api.entity.server.Server;
 import org.javacord.api.entity.user.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ModUpdateHandler {
+	private static final Logger LOGGER = LoggerFactory.getLogger(ModUpdateHandler.class);
+	
 	public static void handleMessage(Message message, Path instancePath) {
 		if (message.getAuthor().isBotUser()) return;
 
@@ -112,10 +116,10 @@ public final class ModUpdateHandler {
 
 	public static CompletableFuture<Void> processMessages(Collection<Message> msgs, Path instancePath) {
 		return CompletableFuture.runAsync(() -> {
-			System.out.printf("running bulk update for %d messages%n", msgs.size());
+			LOGGER.info("running bulk update for {} messages", msgs.size());
 
 			for (Message msg : msgs) {
-				System.out.printf("processing message %d: %s%n", msg.getId(), msg.getContent().replaceAll("\\s+", " ").trim());
+				LOGGER.info("processing message {}: {}", msg.getId(), msg.getContent().replaceAll("\\s+", " ").trim());
 				processMessage(msg, instancePath, false);
 			}
 		}, executor);
@@ -130,7 +134,7 @@ public final class ModUpdateHandler {
 
 				for (String line : msg.getContent().split("\\R")) {
 					line = line.trim();
-					System.out.println("checking "+line);
+					LOGGER.debug("checking {}", line);
 
 					boolean found;
 
@@ -157,9 +161,9 @@ public final class ModUpdateHandler {
 				}
 
 				if (urls.isEmpty()) {
-					System.out.println("no url");
+					LOGGER.debug("no url");
 				} else {
-					System.out.println("urls: "+String.join(", ", urls));
+					LOGGER.debug("urls: {}", String.join(", ", urls));
 				}
 
 				for (Iterator<String> it = urls.iterator(); it.hasNext(); ) {
@@ -168,7 +172,7 @@ public final class ModUpdateHandler {
 					try {
 						URI uri = new URI(rawUrl);
 
-						System.out.println("processing url "+uri);
+						LOGGER.debug("processing url {}", uri);
 						outputs.add(handleUrl(uri, instancePath, simulate));
 						it.remove();
 					} catch (URISyntaxException e) {
@@ -177,7 +181,7 @@ public final class ModUpdateHandler {
 				}
 
 				if (!urls.isEmpty()) {
-					System.out.println("failed: "+String.join(", ", urls));
+					LOGGER.warn("failed: {}", String.join(", ", urls));
 					msg.getChannel().sendMessage("Invalid URLs: "+urls.stream().map(u -> "`%s`".formatted(u)).collect(Collectors.joining(", ")));
 				}
 			}
@@ -186,11 +190,11 @@ public final class ModUpdateHandler {
 				String filename = attachment.getFileName();
 				if (!isJar(filename)) continue;
 
-				System.out.println("processing attachment "+attachment.getUrl());
+				LOGGER.debug("processing attachment {}", attachment.getUrl());
 				outputs.add(installFile(filename, attachment::asInputStream, instancePath, simulate));
 			}
 
-			System.out.printf("installed %d mods%n", outputs.size());
+			LOGGER.info("installed {} mods", outputs.size());
 
 			if (outputs.isEmpty()) {
 				msg.addReaction(simulate ? SIM_FAIL : EMPTY_EMOJI);

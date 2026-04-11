@@ -24,8 +24,12 @@ import java.util.zip.ZipEntry;
 import org.tomlj.Toml;
 import org.tomlj.TomlArray;
 import org.tomlj.TomlTable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Mod {
+	private static final Logger LOGGER = LoggerFactory.getLogger(Mod.class);
+	
 	public static ModList computeModList(Path dir) throws IOException {
 		Map<String, List<ModEntry>> mods = new HashMap<>();
 		@SuppressWarnings("unused")
@@ -49,8 +53,8 @@ public final class Mod {
 		}
 
 		if (DEBUG) {
-			System.out.printf("%d / %d mods broken (%.2f%%)%n", brokenModJars, totalModJars, 100. * brokenModJars / totalModJars);
-			System.out.println(mods);
+			LOGGER.debug("{} / {} mods broken ({} %)", brokenModJars, totalModJars, 100. * brokenModJars / totalModJars);
+			LOGGER.debug("{}", mods);
 		}
 
 		Set<ModEntry> activeMods = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -88,10 +92,10 @@ public final class Mod {
 			}
 
 			if (DEBUG) {
-				System.out.printf("%s:%n", entry.getKey());
+				LOGGER.debug("{}:", entry.getKey());
 
 				for (ModEntry mod : candidates) {
-					System.out.printf("  %c %s (%s)%n", mod == selected ? '*' : ' ', mod.mods().iterator().next().version, dir.relativize(mod.path()));
+					LOGGER.debug("  {} {} ({})", mod == selected ? '*' : ' ', mod.mods().iterator().next().version, dir.relativize(mod.path()));
 				}
 			}
 		}

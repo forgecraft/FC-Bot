@@ -30,8 +30,11 @@ import org.javacord.api.entity.permission.Role;
 import org.javacord.api.entity.server.Server;
 import org.javacord.api.entity.user.User;
 import org.javacord.api.entity.webhook.IncomingWebhook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ApiServer extends ApiCommon {
+	private static final Logger logger = LoggerFactory.getLogger(ApiServer.class);
 	public ApiServer(InetSocketAddress address, String pw) {
 		this.pw = pw;
 
@@ -60,23 +63,23 @@ public final class ApiServer extends ApiCommon {
 
 		if (!context.loggedIn) {
 			if (!cmd.equals(COMMAND_C2S_LOGIN)) {
-				System.out.printf("[DCAPI] missing login from %s%n", rawContext.getRemoteAddress());
+				logger.warn("[DCAPI] missing login from {}", rawContext.getRemoteAddress());
 				return false;
 			}
 
 			int version = buffer.getInt();
 
 			if (version != API_VERSION) {
-				System.out.printf("[DCAPI] invalid api version %d from %s%n", version, rawContext.getRemoteAddress());
+				logger.warn("[DCAPI] invalid api version {} from {}", version, rawContext.getRemoteAddress());
 				return false;
 			}
 
 			if (!readString(buffer).equals(pw)) {
-				System.out.printf("[DCAPI] invalid password from %s%n", rawContext.getRemoteAddress());
+				logger.warn("[DCAPI] invalid password from {}", rawContext.getRemoteAddress());
 				return false;
 			}
 
-			System.out.printf("[DCAPI] successful login from %s%n", rawContext.getRemoteAddress());
+			logger.info("[DCAPI] successful login from {}", rawContext.getRemoteAddress());
 			context.loggedIn = true;
 			return true;
 		}
@@ -139,7 +142,7 @@ public final class ApiServer extends ApiCommon {
 			}
 		}
 		default -> {
-			System.err.printf("[DCAPI] Unknown command: %s%n", cmd);
+			logger.error("[DCAPI] Unknown command: {}", cmd);
 			return false;
 		}
 		}
@@ -246,12 +249,12 @@ public final class ApiServer extends ApiCommon {
 					ServerChannelContext context = new ServerChannelContext();
 					connections.add(context);
 					context.init(channel);
-					System.out.printf("[DCAPI] connection from %s%n", context.getRemoteAddress());
+					logger.info("[DCAPI] connection from {}", context.getRemoteAddress());
 				}
 			} catch (ClosedChannelException e) {
-				System.out.println("[DCAPI] listening channel closed");
+				logger.info("[DCAPI] listening channel closed");
 			} catch (Throwable t) {
-				System.err.printf("[DCAPI] listening failed: %s%n", t.toString());
+				logger.error("[DCAPI] listening failed: {}", t.toString());
 			}
 		}
 
