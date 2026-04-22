@@ -9,7 +9,6 @@ import java.net.http.HttpClient.Redirect;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,15 +39,17 @@ import org.javacord.api.entity.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
+
 public final class ModUpdateHandler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ModUpdateHandler.class);
 
 	private static final String TRIGGER_EMOJI = "👍";
-	private static final String SUCCESS_EMOJI = "spl_success:1496454498129018940";
-	private static final String FAIL_EMOJI = "spl_failed:1496455098526601277";
-	private static final String SIM_PASS = "spl_test_success:1496456120217108560";
-	private static final String SIM_FAIL = "spl_test_failed:1496456201272033442";
-	private static final String SIM_NEW = "spl_new:1496456456755744920";
+	private static final String SUCCESS_EMOJI = "spl_success:1496454498129018940"; // "✔️";
+	private static final String FAIL_EMOJI = "spl_failed:1496455098526601277"; // "❌";
+	private static final String SIM_PASS = "spl_test_success:1496456120217108560"; // "✅";
+	private static final String SIM_FAIL = "spl_test_failed:1496456201272033442"; // "❎";
+	private static final String SIM_NEW = "spl_new:1496456456755744920"; // "✨";
 
 	private static final Path TARGET_DIR = Paths.get("servermods");
 	private static final Duration TIMEOUT = Duration.ofSeconds(20);
@@ -419,9 +420,19 @@ public final class ModUpdateHandler {
 				throw new IOException("jar doesn't contain any mods");
 			}
 
-			boolean movedExistingMods = false;
+			var indexedFiles = ModIndex.instance().getModsByChannelAndId(channelId);
+			var modIds = modInfo.stream().map(ModInfo::modId).collect(Collectors.toSet());
+
+			boolean isNew = true;
 			if (simulate) {
 				Files.delete(tmpFile);
+				for (ModInfo indexedMod : indexedFiles) {
+					if (!modIds.contains(indexedMod.modId())) {
+						continue;
+					}
+
+					isNew = false;
+				}
 			} else {
 				Files.createDirectories(targetDir);
 
@@ -430,13 +441,12 @@ public final class ModUpdateHandler {
 				Path archiveDir = targetDir.resolveSibling(targetDir.getFileName().toString()+"-archive");
 				Files.createDirectories(archiveDir);
 
-				var modIds = modInfo.stream().map(ModInfo::modId).collect(Collectors.toSet());
-				var indexedFiles = ModIndex.instance().getModsByChannelAndId(channelId);
 				for (ModInfo indexedMod : indexedFiles) {
 					if (!modIds.contains(indexedMod.modId())) {
 						continue;
 					}
 
+					isNew = false;
 					Path path = indexedMod.path();
 					// Skips files that are missing.
 					if (!Files.exists(path)) {
@@ -452,7 +462,6 @@ public final class ModUpdateHandler {
 						archiveLocation = Path.of(archiveLocation.toString().replace(".jar", "-%s.jar".formatted(timestamp)));
 					}
 					Files.move(path, archiveLocation, StandardCopyOption.REPLACE_EXISTING);
-					movedExistingMods = true;
 				}
 
 				// Place the new file in the main dir
@@ -460,7 +469,7 @@ public final class ModUpdateHandler {
 				ModIndex.instance().indexPath(channelId, instancePath);
 			}
 
-			return new InstallResult(targetFile, !movedExistingMods);
+			return new InstallResult(targetFile, isNew);
 		} catch (Throwable t) {
 			Files.deleteIfExists(tmpFile);
 			throw t; // rethrow the error
