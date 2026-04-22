@@ -60,7 +60,16 @@ public final class Main {
 
 		DiscordApi api = new DiscordApiBuilder()
 				.setWaitForUsersOnStartup(true)
-				.setIntents(Intent.GUILDS, Intent.GUILD_MEMBERS, Intent.GUILD_MESSAGES, Intent.GUILD_MESSAGE_REACTIONS, Intent.DIRECT_MESSAGES, Intent.DIRECT_MESSAGE_REACTIONS, Intent.MESSAGE_CONTENT)
+				.setIntents(
+						Intent.GUILDS,
+						Intent.GUILD_MEMBERS,
+						Intent.GUILD_MESSAGES,
+						Intent.GUILD_MESSAGE_REACTIONS,
+						Intent.DIRECT_MESSAGES,
+						Intent.DIRECT_MESSAGE_REACTIONS,
+						Intent.MESSAGE_CONTENT,
+						Intent.GUILD_EMOJIS
+				)
 				.setToken(config.getToken())
 				.addServerBecomesAvailableListener(handler)
 				.addMessageCreateListener(handler)

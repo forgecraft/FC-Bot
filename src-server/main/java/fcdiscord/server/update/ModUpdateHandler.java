@@ -235,13 +235,14 @@ public final class ModUpdateHandler {
 				}
 			}
 		} catch (Throwable t) {
-			t.printStackTrace();
+			LOGGER.warn("failed processing of messages", t);
 
-			new MessageBuilder()
-				.append("**Processing failed**\n `%s`".formatted(t))
-				.setAllowedMentions(new AllowedMentionsBuilder().build())
-				.replyTo(msg.getId());
-
+			msg.reply(new MessageBuilder()
+					.append("**Processing failed**\n`%s`".formatted(t))
+					.setAllowedMentions(new AllowedMentionsBuilder().build())
+					.replyTo(msg.getId())
+					.getStringBuilder()
+					.toString());
 			msg.addReaction(simulate ? SIM_FAIL : FAIL_EMOJI);
 
 			if (!simulate) {
@@ -249,7 +250,7 @@ public final class ModUpdateHandler {
 					try {
 						Files.deleteIfExists(output.outputFile());
 					} catch (IOException e) {
-						e.printStackTrace();
+						LOGGER.warn("failed to delete {}", output.outputFile(), e);
 					}
 				}
 			}
