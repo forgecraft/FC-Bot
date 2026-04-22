@@ -43,6 +43,36 @@ import org.slf4j.LoggerFactory;
 public final class ModUpdateHandler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ModUpdateHandler.class);
 
+	private static final String TRIGGER_EMOJI = "👍";
+	private static final String SUCCESS_EMOJI = "<:spl_success:1496454498129018940>️";
+	private static final String FAIL_EMOJI = "<:spl_failed:1496455098526601277>";
+	private static final String SIM_PASS = "<:spl_test_success:1496456120217108560>";
+	private static final String SIM_FAIL = "<:spl_test_failed:1496456201272033442>";
+	private static final String SIM_NEW = "<:spl_new:1496456456755744920>";
+
+	private static final Path TARGET_DIR = Paths.get("servermods");
+	private static final Duration TIMEOUT = Duration.ofSeconds(20);
+
+	private static final Pattern URL_PATTERN = Pattern.compile("(https?://[^\\s<]+[^\\s<\\.,:\\)])"); // approximate set or urls detected by discord (made clickable)
+	private static final String CF_LINK_HOST = "www.curseforge.com";
+	private static final Pattern CF_LINK_PATTERN = Pattern.compile("/minecraft/mc-mods/([^/]+)/(?:files|download)/(\\d+)(?:/file)?");
+
+	private static final Pattern CONTENT_DISPOSITION_PATTERN = Pattern.compile("\\s*attachment\\s*;(?:.+?;)?\\s*"
+			+ "(?:filename\\s*=\\s*|filename\\*\\s*=\\s*[^']+'[^']*')(\".+?\"|[^\"]+)\\s*(?:;.+?)?", Pattern.CASE_INSENSITIVE);
+
+	private static final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+		Thread ret = new Thread(r, "mod update thread");
+		ret.setDaemon(true);
+		ret.setUncaughtExceptionHandler((thread, exc) -> exc.printStackTrace());
+
+		return ret;
+	});
+
+	private static final HttpClient httpClient = HttpClient.newBuilder()
+			.followRedirects(Redirect.NORMAL)
+			.connectTimeout(TIMEOUT)
+			.build();
+
 	public static void handleMessage(Message message, Path instancePath) {
 		if (message.getAuthor().isBotUser()) return;
 
@@ -69,7 +99,6 @@ public final class ModUpdateHandler {
 			Emoji emoji = r.getEmoji();
 
 			if (!emoji.equalsEmoji(SUCCESS_EMOJI)
-					|| !emoji.equalsEmoji(EMPTY_EMOJI)
 					|| !emoji.equalsEmoji(FAIL_EMOJI)) {
 				continue;
 			}
@@ -103,7 +132,6 @@ public final class ModUpdateHandler {
 			Emoji emoji = r.getEmoji();
 
 			if (emoji.equalsEmoji(SUCCESS_EMOJI)
-					|| emoji.equalsEmoji(EMPTY_EMOJI)
 					|| emoji.equalsEmoji(FAIL_EMOJI)) {
 				return false;
 			}
@@ -182,7 +210,7 @@ public final class ModUpdateHandler {
 
                 if (!urls.isEmpty()) {
                     LOGGER.warn("failed: {}", String.join(", ", urls));
-                    msg.getChannel().sendMessage("Invalid URLs: "+urls.stream().map(u -> "`%s`".formatted(u)).collect(Collectors.joining(", ")));
+                    msg.reply("Invalid URLs: "+urls.stream().map("`%s`"::formatted).collect(Collectors.joining(", ")));
                 }
             }
 
@@ -199,9 +227,7 @@ public final class ModUpdateHandler {
 
             LOGGER.info("installed {} mods", outputs.size());
 
-			if (outputs.isEmpty()) {
-				msg.addReaction(simulate ? SIM_FAIL : EMPTY_EMOJI);
-			} else {
+			if (!outputs.isEmpty()) {
 				msg.addReaction(simulate ? SIM_PASS : SUCCESS_EMOJI);
 
 				if (simulate && outputs.stream().anyMatch(InstallResult::newMod)) {
@@ -212,9 +238,9 @@ public final class ModUpdateHandler {
 			t.printStackTrace();
 
 			new MessageBuilder()
-			.append("Processing failed: "+t.toString())
-			.setAllowedMentions(new AllowedMentionsBuilder().build())
-			.send(msg.getChannel());
+				.append("**Processing failed**\n `%s`".formatted(t))
+				.setAllowedMentions(new AllowedMentionsBuilder().build())
+				.replyTo(msg.getId());
 
 			msg.addReaction(simulate ? SIM_FAIL : FAIL_EMOJI);
 
@@ -453,35 +479,4 @@ public final class ModUpdateHandler {
 	private interface DataSource {
 		InputStream open() throws Exception;
 	}
-
-	private static final String TRIGGER_EMOJI = "👍";
-	private static final String SUCCESS_EMOJI = "✔️";
-	private static final String EMPTY_EMOJI = "❔";
-	private static final String FAIL_EMOJI = "❌";
-	private static final String SIM_PASS = "✅";
-	private static final String SIM_FAIL = "❎";
-	private static final String SIM_NEW = "✨";
-
-	private static final Path TARGET_DIR = Paths.get("servermods");
-	private static final Duration TIMEOUT = Duration.ofSeconds(20);
-
-	private static final Pattern URL_PATTERN = Pattern.compile("(https?://[^\\s<]+[^\\s<\\.,:\\)])"); // approximate set or urls detected by discord (made clickable)
-	private static final String CF_LINK_HOST = "www.curseforge.com";
-	private static final Pattern CF_LINK_PATTERN = Pattern.compile("/minecraft/mc-mods/([^/]+)/(?:files|download)/(\\d+)(?:/file)?");
-
-	private static final Pattern CONTENT_DISPOSITION_PATTERN = Pattern.compile("\\s*attachment\\s*;(?:.+?;)?\\s*"
-			+ "(?:filename\\s*=\\s*|filename\\*\\s*=\\s*[^']+'[^']*')(\".+?\"|[^\"]+)\\s*(?:;.+?)?", Pattern.CASE_INSENSITIVE);
-
-	private static final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
-		Thread ret = new Thread(r, "mod update thread");
-		ret.setDaemon(true);
-		ret.setUncaughtExceptionHandler((thread, exc) -> exc.printStackTrace());
-
-		return ret;
-	});
-
-	private static final HttpClient httpClient = HttpClient.newBuilder()
-			.followRedirects(Redirect.NORMAL)
-			.connectTimeout(TIMEOUT)
-			.build();
 }
