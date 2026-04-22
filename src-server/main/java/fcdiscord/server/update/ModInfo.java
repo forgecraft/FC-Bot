@@ -22,14 +22,15 @@ public record ModInfo(
         List<ModInfo> modInfos = new ArrayList<>();
 
         try (JarFile jarFile = new JarFile(jarFilePath.toFile())) {
-            var fabricEntry =  jarFile.getEntry("fabric.mod.json");
-            if (fabricEntry != null) {
-                throw new FabricModException("Fabric mod detected, skipping: " + jarFile);
-            }
-
             var manifest = jarFile.getManifest();
             var neoForgeEntry = jarFile.getEntry("META-INF/neoforge.mods.toml");
             if (neoForgeEntry == null) {
+                // If it's not a neoforge one, is it fabric? Because if it is, Bad!
+                var fabricEntry =  jarFile.getEntry("fabric.mod.json");
+                if (fabricEntry != null) {
+                    throw new FabricModException("Fabric mod detected, skipping: " + jarFile);
+                }
+
                 if (manifest != null) {
                     // If there is no neoforge manifest, we can attempt to parse the manifest
                     var parsedManifest = parseManifest(manifest);
