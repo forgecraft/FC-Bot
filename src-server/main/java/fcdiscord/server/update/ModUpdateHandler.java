@@ -15,6 +15,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -27,8 +29,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import fcdiscord.server.Main;
-import fcdiscord.server.update.Mod.ModEntry;
-import fcdiscord.server.update.Mod.ModList;
 import org.javacord.api.entity.emoji.Emoji;
 import org.javacord.api.entity.message.Message;
 import org.javacord.api.entity.message.MessageAttachment;
@@ -201,7 +201,7 @@ public final class ModUpdateHandler {
 						URI uri = new URI(rawUrl);
 
 						LOGGER.debug("processing url {}", uri);
-						outputs.add(handleUrl(uri, instancePath, simulate));
+						outputs.add(handleUrl(msg.getChannel().getId(), uri, instancePath, simulate));
 						it.remove();
 					} catch (URISyntaxException e) {
 						// ignore
@@ -222,7 +222,7 @@ public final class ModUpdateHandler {
                 if (!isJar(filename)) continue;
 
                 LOGGER.debug("processing attachment {}", attachment.getUrl());
-                outputs.add(installFile(filename, attachment::asInputStream, instancePath, simulate));
+                outputs.add(installFile(msg.getChannel().getId(), filename, attachment::asInputStream, instancePath, simulate));
             }
 
             LOGGER.info("installed {} mods", outputs.size());
@@ -256,7 +256,7 @@ public final class ModUpdateHandler {
 		}
 	}
 
-	private static InstallResult handleUrl(URI uri, Path instancePath, boolean simulate) throws Exception {
+	private static InstallResult handleUrl(Long channelId, URI uri, Path instancePath, boolean simulate) throws Exception {
 		String host = uri.getHost();
 		String path = uri.getPath();
 		if (host == null || path == null || !"http".equals(uri.getScheme()) && !"https".equals(uri.getScheme())) throw new IOException("invalid url: "+uri);
@@ -272,7 +272,7 @@ public final class ModUpdateHandler {
 			uri = fetchFileUriFromCurse(matcher);
 		}
 
-		return handleDownload(uri, instancePath, simulate);
+		return handleDownload(channelId, uri, instancePath, simulate);
 	}
 
 	private static URI fetchFileUriFromCurse(Matcher matcher) throws URISyntaxException, JsonParseException, IOException, InterruptedException {
@@ -330,12 +330,12 @@ public final class ModUpdateHandler {
 		return lookupUrl;
 	}
 
-	private static InstallResult handleDownload(URI uri, Path instancePath, boolean simulate) throws Exception {
+	private static InstallResult handleDownload(Long channelId, URI uri, Path instancePath, boolean simulate) throws Exception {
 		HttpRequest request = HttpRequest.newBuilder(uri).timeout(TIMEOUT).build();
 		String path = uri.getPath();
 
 		if (isJar(path)) { // proper filename available, use it
-			return installFile(path.substring(path.lastIndexOf('/') + 1),
+			return installFile(channelId, path.substring(path.lastIndexOf('/') + 1),
 					() -> {
 						HttpResponse<InputStream> response = httpClient.send(request, BodyHandlers.ofInputStream());
 
@@ -388,7 +388,7 @@ public final class ModUpdateHandler {
 			InputStream is = response.body();
 
 			try {
-				return installFile(filename, () -> is, instancePath, simulate);
+				return installFile(channelId, filename, () -> is, instancePath, simulate);
 			} finally {
 				try {
 					is.close();
@@ -397,7 +397,7 @@ public final class ModUpdateHandler {
 		}
 	}
 
-	private static InstallResult installFile(String filename, DataSource dataSource, Path instancePath, boolean simulate) throws Exception {
+	private static InstallResult installFile(Long channelId, String filename, DataSource dataSource, Path instancePath, boolean simulate) throws Exception {
 		if (!isJar(filename) || filename.contains("/") || filename.contains("\\")) {
 			throw new IOException("invalid filename: "+filename);
 		}
@@ -406,8 +406,6 @@ public final class ModUpdateHandler {
 		Path targetFile = targetDir.resolve(filename).normalize();
 		if (!targetFile.startsWith(targetDir)) throw new IOException("invalid filename: "+filename);
 
-		if (Files.exists(targetFile)) throw new FileAlreadyExistsException(filename);
-
 		Path tmpFile = Files.createTempFile("fcdDl", ".jar");
 
 		try {
@@ -415,58 +413,51 @@ public final class ModUpdateHandler {
 				Files.copy(is, tmpFile, StandardCopyOption.REPLACE_EXISTING);
 			}
 
-			ModEntry mod = Mod.parse(tmpFile);
-			if (mod.mods().isEmpty()) throw new IOException("jar doesn't contain any mods");
-
-			for (Mod m : mod.mods()) {
-				if (m.getVersion() == null) throw new IOException("mod "+m.getModId()+" doesn't declare a version");
+			List<ModInfo> modInfo = ModInfo.parse(tmpFile);
+			if (modInfo.isEmpty()) {
+				throw new IOException("jar doesn't contain any mods");
 			}
 
-			ModList modList = Mod.computeModList(targetDir);
-			List<ModEntry> replacedMods = new ArrayList<>();
-
-			for (ModEntry activeMod : modList.active()) {
-				boolean intersects = false;
-
-				intersectCheckLoop : for (Mod am : activeMod.mods()) {
-					for (Mod nm : mod.mods()) {
-						if (Objects.equals(am.getModId(), nm.getModId())) {
-							intersects = true;
-							break intersectCheckLoop;
-						}
-					}
-				}
-
-				if (intersects) {
-					if (Mod.compareMods(mod, activeMod) <= 0) {
-						throw new IOException("submitted mod "+mod.mods()+" doesn't have a higher version than the currently active mod "+activeMod.mods());
-					}
-
-					replacedMods.add(activeMod);
-				}
-			}
-
+			boolean movedExistingMods = false;
 			if (simulate) {
 				Files.delete(tmpFile);
 			} else {
 				Files.createDirectories(targetDir);
 
-				if (!replacedMods.isEmpty()) {
-					Path archiveDir = targetDir.resolveSibling(targetDir.getFileName().toString()+"-archive");
-					Files.createDirectories(archiveDir);
+				// If we aren't simulating the flow. We should actively pull the mod from the own index
+				// if it exists, we should move the old one and place the new one in.
+				Path archiveDir = targetDir.resolveSibling(targetDir.getFileName().toString()+"-archive");
+				Files.createDirectories(archiveDir);
 
-					for (ModEntry m : replacedMods) {
-						Files.move(m.path(), archiveDir.resolve(targetDir.relativize(m.path())), StandardCopyOption.REPLACE_EXISTING);
+				var modIds = modInfo.stream().map(ModInfo::modId).collect(Collectors.toSet());
+				var indexedFiles = ModIndex.instance().getModsByChannelAndId(channelId);
+				for (ModInfo indexedMod : indexedFiles) {
+					if (!modIds.contains(indexedMod.modId())) {
+						continue;
 					}
+
+					Path path = indexedMod.path();
+					Path archiveLocation = archiveDir.resolve(targetDir.relativize(path));
+					if (Files.exists(archiveLocation)) {
+						// Create a yyyy-mm-dd_hh-mm timestamp
+						DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
+						String timestamp = formatter.format(LocalDateTime.now());
+
+						archiveLocation = Path.of(archiveLocation.toString().replace(".jar", "-%s.jar".formatted(timestamp)));
+					}
+					Files.move(path, archiveLocation, StandardCopyOption.REPLACE_EXISTING);
+					movedExistingMods = true;
 				}
 
+				// Place the new file in the main dir
 				Files.move(tmpFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
+				ModIndex.instance().indexPath(channelId, instancePath);
 			}
 
-			return new InstallResult(targetFile, replacedMods.isEmpty());
+			return new InstallResult(targetFile, !movedExistingMods);
 		} catch (Throwable t) {
 			Files.deleteIfExists(tmpFile);
-			throw t;
+			throw t; // rethrow the error
 		}
 	}
 

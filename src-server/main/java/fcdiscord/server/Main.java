@@ -1,12 +1,14 @@
 package fcdiscord.server;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 import fcdiscord.Config;
+import fcdiscord.server.update.ModIndex;
 import fcdiscord.server.update.ModUpdateHandler;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.DiscordApiBuilder;
@@ -75,12 +77,17 @@ public final class Main {
 	}
 
 	private static class Handler implements ServerBecomesAvailableListener, MessageCreateListener, ReactionAddListener {
-		Handler(long guildId, Collection<Config.Instance> instances) {
+		Handler(long guildId, Collection<Config.Instance> instances) throws IOException {
 			this.guildId = guildId;
 			this.instanceMap = new HashMap<>(instances.size());
 
 			for (Config.Instance instance : instances) {
+				if (!Files.exists(instance.getBaseDir().resolve("servermods"))) {
+					Files.createDirectories(instance.getBaseDir());
+				}
+
 				instanceMap.put(instance.getChannelId(), instance);
+				ModIndex.instance().indexPath(instance.getChannelId(), instance.getBaseDir());
 			}
 		}
 
