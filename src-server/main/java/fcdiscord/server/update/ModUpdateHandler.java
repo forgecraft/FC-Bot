@@ -44,11 +44,11 @@ public final class ModUpdateHandler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ModUpdateHandler.class);
 
 	private static final String TRIGGER_EMOJI = "👍";
-	private static final String SUCCESS_EMOJI = "<:spl_success:1496454498129018940>️";
-	private static final String FAIL_EMOJI = "<:spl_failed:1496455098526601277>";
-	private static final String SIM_PASS = "<:spl_test_success:1496456120217108560>";
-	private static final String SIM_FAIL = "<:spl_test_failed:1496456201272033442>";
-	private static final String SIM_NEW = "<:spl_new:1496456456755744920>";
+	private static final String SUCCESS_EMOJI = "spl_success:1496454498129018940";
+	private static final String FAIL_EMOJI = "spl_failed:1496455098526601277";
+	private static final String SIM_PASS = "spl_test_success:1496456120217108560";
+	private static final String SIM_FAIL = "spl_test_failed:1496456201272033442";
+	private static final String SIM_NEW = "spl_new:1496456456755744920";
 
 	private static final Path TARGET_DIR = Paths.get("servermods");
 	private static final Duration TIMEOUT = Duration.ofSeconds(20);
