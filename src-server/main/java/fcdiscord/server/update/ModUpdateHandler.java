@@ -438,6 +438,11 @@ public final class ModUpdateHandler {
 					}
 
 					Path path = indexedMod.path();
+					// Skips files that are missing.
+					if (!Files.exists(path)) {
+						continue;
+					}
+
 					Path archiveLocation = archiveDir.resolve(targetDir.relativize(path));
 					if (Files.exists(archiveLocation)) {
 						// Create a yyyy-mm-dd_hh-mm timestamp
